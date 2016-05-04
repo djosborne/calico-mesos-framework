@@ -19,7 +19,7 @@ Easily test Calico networking in your mesos cluster.
 
 Usage:
   calico_framework.py [--master=<MASTER>] [--num-agents=<NUM_AGENTS>] 
-  [--default-executor=(true|false)]
+  [--default-executor=(true|false)] [--cni]
 
 Dockerized:
   docker run calico/calico-mesos-framework <args...>
@@ -37,6 +37,7 @@ Options:
                                         use the default executor. Note: this requires
                                         your agent has calico_executor.py installed 
                                         properly. [default: false]
+  --cni                    Flag indicating if CNI tests should be run. [default: false]
 """
 import os
 import sys
@@ -580,6 +581,8 @@ if __name__ == "__main__":
     master_ip = arguments['--master']
     print "Connecting to Master: ", master_ip
 
+    cni = arguments['--cni']
+
     try:
         num_agents = int(arguments['--num-agents'])
     except ValueError:
@@ -604,6 +607,17 @@ if __name__ == "__main__":
     framework.principal = "test-framework-python"
 
     scheduler = TestScheduler(implicitAcknowledgements)
+
+    if cni:
+        test_name = "Same-Host CNI tasks Can Ping"
+        sleep_task = SleepTask(slave=0, network_name="calico-net-1")
+        ping_task = PingTask(slave=0, network_name="calico-net-1", can_ping_targets=[sleep_task])
+        scheduler.tests.append(TestCase([sleep_task, ping_task], name=test_name))
+
+        test_name = "Cross-Host CNI tasks Can Ping"
+        sleep_task = SleepTask(slave=0, network_name="calico-net-1")
+        ping_task = PingTask(slave=1, network_name="calico-net-1", can_ping_targets=[sleep_task])
+        scheduler.tests.append(TestCase([sleep_task, ping_task], name=test_name))
 
     test_name = "Same-Host Same-Netgroups Can Ping"
     sleep_task = SleepTask(netgroups=['netgroup_a'], slave=0)
